@@ -34,8 +34,13 @@ executable wec
   ghc-options:      -Wall -O2 -threaded
   hs-source-dirs:   exe
   main-is:          Main.hs
+  other-modules:    Paths_wec
+  autogen-modules:  Paths_wec
   build-depends:
     base < 5,
+    binary,
+    bytestring,
+    optparse-applicative,
     wec
 
 test-suite test
