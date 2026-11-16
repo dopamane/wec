@@ -7,6 +7,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BSC
+import Data.Int
 
 type Riff = [Ck]
 
@@ -38,3 +39,15 @@ instance Binary Ck where
 
 wec :: Int -> Riff -> Riff
 wec _ = id
+
+delayMix :: Int -> [Int16] -> [Int16]
+delayMix n xs = zipWith satSum (xs ++ replicate n 0) (replicate n 0 ++ xs)
+
+satSum :: Int16 -> Int16 -> Int16
+satSum x y = clip $ fromIntegral x + fromIntegral y
+
+clip :: Integer -> Int16
+clip x
+  | x > fromIntegral (maxBound :: Int16) = maxBound
+  | x < fromIntegral (minBound :: Int16) = minBound
+  | otherwise = fromIntegral x
