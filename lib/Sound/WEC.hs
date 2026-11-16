@@ -6,6 +6,7 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
 import Data.Int
 
@@ -38,7 +39,14 @@ instance Binary Ck where
       Right d -> putLazyByteString d >> when (odd csz) (putWord8 0)
 
 wec :: Int -> Riff -> Riff
-wec _ = id
+wec n [riff@Ck{ckID="RIFF", ckDat=Left[fmt, dat@Ck{ckID="data", ckSz=datSz, ckDat=Right bs}]}
+      ] = [riff{ckDat=Left[fmt, dat{ckDat=Right bs'}]}]
+  where
+    bs' = BS.take (fromIntegral datSz) $ dmix n bs
+wec _ _ = error "invalid format"
+
+dmix :: Int -> ByteString -> ByteString
+dmix n = runPut . foldMap putInt16le . delayMix n . runGet (many getInt16le)
 
 delayMix :: Int -> [Int16] -> [Int16]
 delayMix n xs = zipWith satSum (xs ++ replicate n 0) (replicate n 0 ++ xs)
