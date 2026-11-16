@@ -1,6 +1,11 @@
-module Sound.WEC (wec, Riff(..)) where
+module Sound.WEC (wec, Riff, Ck(..)) where
 
-data Riff = Riff
+import Data.ByteString.Lazy (ByteString)
+import Data.Word
+
+type Riff = [Ck]
+
+data Ck = Ck{ckID :: String, ckSz :: Word32, ckDat :: Either Riff ByteString}
   deriving (Eq, Read, Show)
 
 wec :: Int -> Riff -> Riff
