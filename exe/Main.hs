@@ -1,8 +1,8 @@
 module Main (main) where
 
-import qualified MyLib (someFunc)
+import Sound.WEC
 
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+  putStrLn $ "Hello, Haskell!"
+  print $ wec 5 Riff
