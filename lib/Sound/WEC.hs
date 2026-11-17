@@ -43,25 +43,33 @@ wec n r = case filter (("RIFF" ==) . ckID) r of
   [] -> Left "RIFF chunk not found"
   [riff]
     | ckTy riff == "WAVE" -> case ckDat riff of
-      Left cs -> do
-       fmt <- case filter (("fmt " ==) . ckID) cs of
-         [] -> Left "fmt chunk not found"
-         [fmt] -> Right fmt
-         _ -> Left "More than one fmt chunk found"
-       case filter (("data" ==) . ckID) cs of
-         [] -> Left "data chunk not found"
-         [Ck{ckSz=datSz, ckDat=dat}] -> case dat of
-           Left _ -> Left "Invalid data structure, expecting bytes but got list"
-           Right bs -> do
-             let bs' = BS.take (fromIntegral datSz) $ dmix n bs
-             return [riff{ckDat=Left[fmt, mkdat bs']}]
-         _ -> Left "More than one data chunk found"
+      Left cs -> case filter (("fmt " ==) . ckID) cs of
+        [] -> Left "fmt chunk not found"
+        [fmt@Ck{ckDat=Right fmtdat}] -> case runGetOrFail getSampleRate fmtdat of
+          Left (_, _, er) -> Left $ "getSampleRate: " ++ er
+          Right (_, _, sr) -> do
+            Ck{ckSz=datSz, ckDat=dat} <- findChunk "data" cs
+            case dat of
+              Left _ -> Left "Invalid data structure, expecting bytes but got list"
+              Right bs -> do
+                let bs' = BS.take (fromIntegral datSz) $ dmix n bs
+                return [riff{ckDat=Left[fmt, mkdat bs']}]
+        _ -> Left "More than one fmt chunk found"
       Right _ -> Left "Invalid RIFF structure, expecting format and data but got bytes"
     | otherwise -> Left $ "Expecting WAVE type but got " ++ ckTy riff
   _ -> Left "More than one RIFF chunk found"
 
 mkdat :: ByteString -> Ck
 mkdat bs = Ck "data" (fromIntegral $ BS.length bs) "" $ Right bs
+
+getSampleRate :: Get Word32
+getSampleRate = getWord16le *> getWord16le *> getWord32le
+
+findChunk :: String -> Riff -> Either String Ck
+findChunk cid r = case filter ((cid ==) . ckID) r of
+  [] -> Left $ cid ++ " chunk not found"
+  [ck] -> Right ck
+  _ -> Left $ "More than one " ++ cid ++ " chunk found"
 
 dmix :: Int -> ByteString -> ByteString
 dmix n = runPut . foldMap putInt16le . delayMix n . runGet (many getInt16le)
