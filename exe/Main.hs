@@ -11,8 +11,8 @@ import Sound.WEC
 main :: IO ()
 main = do
   CLI p nM oM fM <- customExecParser prefs' $ pinfo $ showVersion version
-  r <- runGet getRiff <$> maybe BS.getContents BS.readFile fM
-  let r' = maybe id wec nM r
+  r  <- runGet getRiff <$> maybe BS.getContents BS.readFile fM
+  r' <- either fail return $ maybe Right wec nM r
   case oM of
     Nothing | p -> print r'
             | otherwise -> BS.putStr $ runPut $ putRiff r'

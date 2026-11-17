@@ -38,12 +38,30 @@ instance Binary Ck where
       Left  r -> putRiff r
       Right d -> putLazyByteString d >> when (odd csz) (putWord8 0)
 
-wec :: Int -> Riff -> Riff
-wec n [riff@Ck{ckID="RIFF", ckDat=Left[fmt, dat@Ck{ckID="data", ckSz=datSz, ckDat=Right bs}]}
-      ] = [riff{ckDat=Left[fmt, dat{ckDat=Right bs'}]}]
-  where
-    bs' = BS.take (fromIntegral datSz) $ dmix n bs
-wec _ _ = error "invalid format"
+wec :: Int -> Riff -> Either String Riff
+wec n r = case filter (("RIFF" ==) . ckID) r of
+  [] -> Left "RIFF chunk not found"
+  [riff]
+    | ckTy riff == "WAVE" -> case ckDat riff of
+      Left cs -> do
+       fmt <- case filter (("fmt " ==) . ckID) cs of
+         [] -> Left "fmt chunk not found"
+         [fmt] -> Right fmt
+         _ -> Left "More than one fmt chunk found"
+       case filter (("data" ==) . ckID) cs of
+         [] -> Left "data chunk not found"
+         [Ck{ckSz=datSz, ckDat=dat}] -> case dat of
+           Left _ -> Left "Invalid data structure, expecting bytes but got list"
+           Right bs -> do
+             let bs' = BS.take (fromIntegral datSz) $ dmix n bs
+             return [riff{ckDat=Left[fmt, mkdat bs']}]
+         _ -> Left "More than one data chunk found"
+      Right _ -> Left "Invalid RIFF structure, expecting format and data but got bytes"
+    | otherwise -> Left $ "Expecting WAVE type but got " ++ ckTy riff
+  _ -> Left "More than one RIFF chunk found"
+
+mkdat :: ByteString -> Ck
+mkdat bs = Ck "data" (fromIntegral $ BS.length bs) "" $ Right bs
 
 dmix :: Int -> ByteString -> ByteString
 dmix n = runPut . foldMap putInt16le . delayMix n . runGet (many getInt16le)
