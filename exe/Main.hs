@@ -3,6 +3,7 @@ module Main (main) where
 import Data.Binary.Get
 import Data.Binary.Put
 import qualified Data.ByteString.Lazy as BS
+import Data.Rap
 import Data.Version
 import Options.Applicative
 import Paths_wec
@@ -11,13 +12,13 @@ import Sound.WEC
 main :: IO ()
 main = do
   CLI p dM oM fM <- customExecParser prefs' $ pinfo $ showVersion version
-  r  <- runGet getRiff <$> maybe BS.getContents BS.readFile fM
+  r  <- runGet getRap <$> maybe BS.getContents BS.readFile fM
   r' <- either fail return $ maybe Right wec dM r
   case oM of
     Nothing | p -> print r'
-            | otherwise -> BS.putStr $ runPut $ putRiff r'
+            | otherwise -> BS.putStr $ runPut $ putRap r'
     Just o  | p -> writeFile o $ show r'
-            | otherwise -> BS.writeFile o $ runPut $ putRiff r'
+            | otherwise -> BS.writeFile o $ runPut $ putRap r'
 
 prefs' :: ParserPrefs
 prefs' = prefs $ showHelpOnError <> showHelpOnEmpty

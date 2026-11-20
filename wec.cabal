@@ -27,7 +27,8 @@ library
   build-depends:
     base < 5,
     binary,
-    bytestring
+    bytestring,
+    rap
 
 executable wec
   default-language: Haskell2010
@@ -41,6 +42,7 @@ executable wec
     binary,
     bytestring,
     optparse-applicative,
+    rap,
     wec
 
 test-suite test
