@@ -5,7 +5,7 @@ Usage
 
 ```
 espeak-ng -w hello.wav "hello"
-wec -d 1.5 hello.wav | aplay
+wec -d 1 -v 25 hello.wav | aplay
 ```
 
 Development

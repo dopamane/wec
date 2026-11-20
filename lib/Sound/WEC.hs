@@ -1,6 +1,7 @@
 module Sound.WEC (wec) where
 
 import Control.Applicative
+import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
@@ -11,41 +12,40 @@ import Data.Rap
 -- | wav echo
 wec
   :: Double -- ^ delay seconds
+  -> Double -- ^ volume percent
   -> Rap -> Either String Rap
-wec d r = do
-  (fmt, sr) <- fmtSampleRate r
-  let n = round $ fromIntegral sr * d
-  bs <- dataBytes r
-  return [Stanza "RIFF" "WAVE" [fmt, Verse "data" $ dmix n bs]]
-
-fmtSampleRate :: Rap -> Either String (Riff, Word32)
-fmtSampleRate r =
-  case [(fmt, bs) | Stanza "RIFF" "WAVE" s <- r
-                  , fmt@(Verse "fmt " bs)  <- s] of
-  []          -> Left "no fmt found"
-  [(fmt, bs)] -> (,) fmt <$> readSampleRate bs
-  _           -> Left "more than one fmt found"
+wec d v r
+  | v < 0 || v > 100 = Left $ "volume " ++ show v ++ "% out of bounds"
+  | otherwise = do
+    rs <- one "wave" [rs | Stanza "RIFF" "WAVE" rs <- r]
+    (fmt, sr) <- join $ one "fmt" [(,) fmt <$> readSampleRate bs | fmt@(Verse "fmt " bs) <- rs]
+    let n = round $ fromIntegral sr * d
+    bs <- one "data" [bs | Verse "data" bs <- rs]
+    return [Stanza "RIFF" "WAVE" [fmt, Verse "data" $ echo n v bs]]
 
 readSampleRate :: ByteString -> Either String Word32
 readSampleRate bs =
   case runGetOrFail (getWord16le *> getWord16le *> getWord32le) bs of
-    Left  (_, _, er) -> Left $ "getSampleRate: " ++ er
+    Left  (_, _, er) -> Left $ "readSampleRate: " ++ er
     Right (_, _, sr) -> Right sr
 
-dataBytes :: Rap -> Either String ByteString
-dataBytes r =
-  case [bs | Stanza "RIFF" "WAVE" s <- r, Verse "data" bs <- s] of
-    []   -> Left "no data found"
-    [bs] -> Right bs
-    _    -> Left "more than one data found"
+one :: String -> [a] -> Either String a
+one lbl vs = case vs of
+  []  -> Left $ "no " ++ lbl ++ " found"
+  [v] -> Right v
+  _   -> Left $ "more than one " ++ lbl ++ " found"
 
-dmix
-  :: Int -- ^ delay sample count
+echo
+  :: Int    -- ^ delay sample count
+  -> Double -- ^ volume percent
   -> ByteString -> ByteString
-dmix n = runPut . foldMap putInt16le . delayMix n . runGet (many getInt16le)
+echo n v = runPut . foldMap putInt16le . echo' n v . runGet (many getInt16le)
 
-delayMix :: Int -> [Int16] -> [Int16]
-delayMix n xs = zipWith satSum (xs ++ replicate n 0) (replicate n 0 ++ xs)
+echo' :: Int -> Double -> [Int16] -> [Int16]
+echo' n v xs = zipWith satSum (xs ++ replicate n 0) (replicate n 0 ++ map (volume v) xs)
+
+volume :: Double -> Int16 -> Int16
+volume v s = round $ fromIntegral s * v / 100
 
 satSum :: Int16 -> Int16 -> Int16
 satSum x y = clip $ fromIntegral x + fromIntegral y
