@@ -15,14 +15,18 @@ import Sound.Echo
 
 main :: IO ()
 main = do
-  CLI s d v oM fM <- customExecParser prefs' $ pinfo $ showVersion version
-  when (v < 0 || v > 100) $ fail $ "volume decay out of range: " ++ show v
-  r  <- runGet getRap <$> maybe BS.getContents BS.readFile fM
+  (s, d, v, c, iM, oM) <- customExecParser prefs' $
+    info (parser <**> simpleVersioner (showVersion version) <**> helper) $
+    progDesc "wav echo effect"
+  when (v < 0 || v > 100) $ fail $ "echo decay percent out of range: " ++ show v
+  r  <- runGet getRap <$> maybe BS.getContents BS.readFile iM
   rs <- one "wave" [rs | Stanza "RIFF" "WAVE" rs <- r]
   (fmt, sr) <- join $ one "fmt" [(,) fmt <$> readSampleRate bs | fmt@(Verse "fmt " bs) <- rs]
   let n = round $ fromIntegral sr * d
   samples <- one "data" [runGet (many getInt16le) bs | Verse "data" bs <- rs]
-  let samples' = take (length samples + n * 3) $ echo n 3 0.5 $ map norm samples
+  let n' = length samples + n * c
+  when (fromIntegral n' > (maxBound :: Word32)) $ fail $ "echo sample count too large: " ++ show n'
+  let samples' = take n' $ echo n c (1 - v / 100) $ map norm samples
       r' = [Stanza "RIFF" "WAVE"
            [fmt, Verse "data" $ runPut $ foldMap (putInt16le . denorm) samples']]
   case oM of
@@ -34,19 +38,15 @@ main = do
 prefs' :: ParserPrefs
 prefs' = prefs $ showHelpOnError <> showHelpOnEmpty
 
-pinfo :: String -> ParserInfo CLI
-pinfo v = info (parser <**> simpleVersioner v <**> helper) $ progDesc "wav echo effect"
-
-data CLI = CLI Bool Double Double (Maybe FilePath) (Maybe FilePath)
-
-parser :: Parser CLI
-parser = CLI <$> switch (short 's' <> help "show")
-  <*> option auto (short 'd' <> metavar "DBL" <> help "Sample delay in seconds")
-  <*> option auto (short 'v' <> metavar "DBL" <> help "Volume decay percent")
+parser :: Parser (Bool, Double, Double, Int, Maybe FilePath, Maybe FilePath)
+parser = (,,,,,) <$> switch (short 's' <> help "show")
+  <*> option auto (short 't' <> metavar "DBL" <> help "delay seconds")
+  <*> option auto (short 'p' <> metavar "DBL" <> help "decay percent")
+  <*> option auto (short 'c' <> metavar "INT" <> help "count")
+  <*> optional (strOption $ short 'i' <> metavar "FILE" <> completer (bashCompleter "file")
+      <> help "input wav file otherwise STDIN")
   <*> optional (strOption $ short 'o' <> metavar "FILE" <> completer (bashCompleter "file")
-      <> help "File output otherwise STDOUT")
-  <*> optional (strArgument $ metavar "FILE" <> completer (bashCompleter "file")
-      <> help "Optional RIFF file otherwise STDIN")
+      <> help "output wav file otherwise STDOUT")
 
 readSampleRate :: ByteString -> IO Word32
 readSampleRate bs =
