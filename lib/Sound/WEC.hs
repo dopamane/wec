@@ -7,6 +7,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import Data.Int
+import Data.List
 import Data.Rap
 
 -- | wav echo
@@ -55,3 +56,18 @@ clip x
   | x > fromIntegral (maxBound :: Int16) = maxBound
   | x < fromIntegral (minBound :: Int16) = minBound
   | otherwise = fromIntegral x
+
+clip' :: Double -> Double
+clip' x
+  | x > 0 = min   1  x
+  | x < 0 = max (-1) x
+  | otherwise = 0
+
+echo''
+  :: Int      -- ^ delay sample count
+  -> Int      -- ^ echo count
+  -> Double   -- ^ amp decay [0,1]
+  -> [Double] -- ^ input sound
+  -> [Double]
+echo'' d c _ s = map (clip' . sum) $ transpose $
+  (s ++ repeat 0) : [replicate (d * i) 0 ++ s ++ repeat 0 | i <- [1..c]]
