@@ -22,7 +22,7 @@ main = do
   (fmt, sr) <- join $ one "fmt" [(,) fmt <$> readSampleRate bs | fmt@(Verse "fmt " bs) <- rs]
   let n = round $ fromIntegral sr * d
   samples <- one "data" [runGet (many getInt16le) bs | Verse "data" bs <- rs]
-  let samples' = echo n 3 0.5 $ map norm samples
+  let samples' = take (length samples + n * 3) $ echo n 3 0.5 $ map norm samples
       r' = [Stanza "RIFF" "WAVE"
            [fmt, Verse "data" $ runPut $ foldMap (putInt16le . denorm) samples']]
   case oM of
