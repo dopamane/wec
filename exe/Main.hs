@@ -61,7 +61,19 @@ one lbl vs = case vs of
   _   -> fail $ "more than one " ++ lbl ++ " found"
 
 denorm :: Double -> Int16
-denorm = undefined
+denorm d
+  | d > 0 = fromIntegral $ min (maxb :: Integer) $ round (d * maxb)
+  | d < 0 = fromIntegral $ max (minb :: Integer) $ negate $ round (d * minb)
+  | otherwise = 0
+
+maxb :: Num a => a
+maxb = fromIntegral (maxBound :: Int16)
+
+minb :: Num a => a
+minb = fromIntegral (minBound :: Int16)
 
 norm :: Int16 -> Double
-norm = undefined
+norm i
+  | i > 0 = min   1  $ fromIntegral i / maxb
+  | i < 0 = max (-1) $ negate $ fromIntegral i / minb
+  | otherwise = 0
