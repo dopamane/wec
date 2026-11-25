@@ -49,4 +49,6 @@ test-suite test
   main-is:          Main.hs
   build-depends:
     base < 5,
+    tasty,
+    tasty-hunit,
     wec
