@@ -12,8 +12,6 @@ category:           Sound
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
                     README.md
-data-dir:           data
-data-files:         hello.wav
 
 source-repository head
   type: git
