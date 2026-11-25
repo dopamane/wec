@@ -9,8 +9,8 @@ echo
   -> [Double] -- ^ input sound [0,1]
   -> [Double]
 echo n c v s = map (clip . sum) $ transpose $
-  (s ++ replicate (n * c) 0) : [ replicate (n * i) 0 ++ map (a *) s ++ replicate (n * i) 0
-                               | (i, a) <- zip [1..c] $ iterate (* v) v]
+  s : [ replicate (n * i) 0 ++ map (a *) s
+      | (i, a) <- zip [1..c] $ iterate (* v) v]
 
 clip :: Double -> Double
 clip x
