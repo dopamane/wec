@@ -15,20 +15,10 @@ import Sound.Echo
 
 main :: IO ()
 main = do
-  (s, d, v, c, iM, oM) <- customExecParser prefs' $
+  (s, t, p, c, iM, oM) <- customExecParser prefs' $
     info (parser <**> simpleVersioner (showVersion version) <**> helper) $
     progDesc "wav echo effect"
-  when (v < 0 || v > 100) $ fail $ "echo decay percent out of range: " ++ show v
-  r  <- runGet getRap <$> maybe BS.getContents BS.readFile iM
-  rs <- one "wave" [rs | Stanza "RIFF" "WAVE" rs <- r]
-  (fmt, sr) <- join $ one "fmt" [(,) fmt <$> readSampleRate bs | fmt@(Verse "fmt " bs) <- rs]
-  let n = round $ fromIntegral sr * d
-  samples <- one "data" [runGet (many getInt16le) bs | Verse "data" bs <- rs]
-  let n' = length samples + n * c
-  when (fromIntegral n' > (maxBound :: Word32)) $ fail $ "echo sample count too large: " ++ show n'
-  let samples' = take n' $ echo n c (1 - v / 100) $ map norm samples
-      r' = [Stanza "RIFF" "WAVE"
-           [fmt, Verse "data" $ runPut $ foldMap (putInt16le . denorm) samples']]
+  r' <- either fail return . wec t p c =<< maybe BS.getContents BS.readFile iM
   case oM of
     Nothing | s -> print r'
             | otherwise -> BS.putStr $ runPut $ putRap r'
@@ -48,17 +38,34 @@ parser = (,,,,,) <$> switch (short 's' <> help "show")
   <*> optional (strOption $ short 'o' <> metavar "FILE" <> completer (bashCompleter "file")
       <> help "output wav file otherwise STDOUT")
 
-readSampleRate :: ByteString -> IO Word32
+wec :: Double -> Double -> Int -> ByteString -> Either String Rap
+wec t p c i
+  | p < 0 || p > 100 = Left $ "decay percent out of range: " ++ show p
+  | otherwise = do
+    r <- case runGetOrFail getRap i of
+      Left  (_, _, e) -> Left $ "getRap: " ++ e
+      Right (_, _, a) -> Right a
+    rs <- one "wave" [rs | Stanza "RIFF" "WAVE" rs <- r]
+    (fmt, sr) <- join $ one "fmt" [(,) fmt <$> readSampleRate bs | fmt@(Verse "fmt " bs) <- rs]
+    let n = round $ fromIntegral sr * t
+    samples <- one "data" [runGet (many getInt16le) bs | Verse "data" bs <- rs]
+    let n' = length samples + n * c
+    when (fromIntegral n' > (maxBound :: Word32)) $ Left $ "echo sample count too large: " ++ show n'
+    let samples' = take n' $ echo n c (1 - p / 100) $ map norm samples
+    return [Stanza "RIFF" "WAVE"
+           [fmt, Verse "data" $ runPut $ foldMap (putInt16le . denorm) samples']]
+
+readSampleRate :: ByteString -> Either String Word32
 readSampleRate bs =
   case runGetOrFail (getWord16le *> getWord16le *> getWord32le) bs of
-    Left  (_, _, er) -> fail $ "readSampleRate: " ++ er
-    Right (_, _, sr) -> return sr
+    Left  (_, _, er) -> Left $ "readSampleRate: " ++ er
+    Right (_, _, sr) -> Right sr
 
-one :: String -> [a] -> IO a
+one :: String -> [a] -> Either String a
 one lbl vs = case vs of
-  []  -> fail $ "no " ++ lbl ++ " found"
-  [v] -> return v
-  _   -> fail $ "more than one " ++ lbl ++ " found"
+  []  -> Left $ "no " ++ lbl ++ " found"
+  [v] -> Right v
+  _   -> Left $ "more than one " ++ lbl ++ " found"
 
 denorm :: Double -> Int16
 denorm d
