@@ -40,7 +40,9 @@ parser = (,,,,,) <$> switch (short 's' <> help "show")
 
 wec :: Double -> Double -> Int -> ByteString -> Either String Rap
 wec t p c i
+  | t < 0 = Left $ "delay seconds must be non-negative: " ++ show t
   | p < 0 || p > 100 = Left $ "decay percent out of range: " ++ show p
+  | c < 0 = Left $ "echo count must be non-negative: " ++ show c
   | otherwise = do
     r <- case runGetOrFail getRap i of
       Left  (_, _, e) -> Left $ "getRap: " ++ e

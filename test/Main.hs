@@ -14,4 +14,5 @@ main = defaultMain $ testGroup "Sound.Echo"
   , testCase "amps" $ echo 2 2 0.5 [1] @?= [1, 0, 0.5, 0, 0.25]
   , testCase "sum" $ echo 1 1 1 [0.5, 0.5] @?= [0.5, 1, 0.5]
   , testCase "clip" $ echo 1 1 1 [0.75, 0.75] @?= [0.75, 1, 0.75]
+  , testCase "overlap" $ echo 0 1 1 [0.5, 0.25] @?= [1, 0.5]
   ]
